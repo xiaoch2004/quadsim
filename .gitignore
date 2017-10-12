@@ -1,0 +1,12 @@
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# MATLAB
+*.txt
+*.mat
+*.eps
+*.png
+*.jpg
+*.asv
