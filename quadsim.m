@@ -11,9 +11,9 @@ g = 9.8;	% acceleration of gravity
 Ixx = 0.05;	% 
 Iyy = 0.05;
 Izz = 0.1;
-kdx = 0.15;
+kdx = 0.8;
 kdy = 0.8;
-kdz = 0.65;
+kdz = 1;
 Kd = diag([kdx,kdy,kdz]);
 I = diag([Ixx,Iyy,Izz]);
 s = zeros(4,1);
@@ -22,9 +22,9 @@ s = zeros(4,1);
 x = 0;
 y = 0;
 z = 0;
-phi = 0.2;
+phi = 0.5;
 theta = -0.4;
-psi = 0.3;
+psi = 1;
 u = 0;
 v = 0;
 w = 0;
@@ -38,7 +38,7 @@ X3 = [phi;theta;psi];
 X4 = [p;q;r];
 
 start_time = 0;
-end_time = 5;
+end_time = 20;
 dt = 0.01;
 timePeriod = start_time:dt:end_time;
 
@@ -75,16 +75,18 @@ for t = timePeriod
 	inte1 = inte1 + dt*e1;
 	de1 = (e1-laste1)/dt;
     
-	ControlInput = PIDcontrol(t, e1, de1, inte1, end_time, X3, m, g, I);
+	%ControlInput = PIDcontrol(t, e1, de1, inte1, end_time, X3, m, g, I);
     %ControlInput(2:4) = sat(ControlInput(2:4),0.5);
 	ControlInput = SMControl(X1,X2,X3,X4, interMediate1, R_omega, m, g, kdz, I);
 
 %	States update
-
+    mdisturb = 0;
+    %idisturb = [0.5*sin(t), 0.4*cos(t), 0.4*sin(t+0.3)];
+    
 	dX1 = X2;
-	dX2 = [0;0;-g] + (R/m) * [0;0;ControlInput(1)] - Kd*X2*(1/m) ;
+	dX2 = [0;0;-g] + (R/(m + mdisturb)) * [0;0;ControlInput(1)] - Kd*X2*(1/(m + mdisturb)) ;
 	dX3 = inv(R_omega) * X4 ;
-	dX4 = inv(I) * ControlInput(2:4) - interMediate1;
+	dX4 = inv(I) * ControlInput(2:4) - interMediate1 + 4*sin(3*t)*[1;1;1];
 
 	X1 = X1 + dt*dX1;
 	X2 = X2 + dt*dX2;
@@ -128,7 +130,7 @@ plot(DATA2(:,1),DATA2(:,5),'b'); title('Z moment');xlabel('time/s');ylabel('Iner
 
 function output = PIDcontrol(t,e1,de1,inte1,intermediate1,X3,m,g,I)	% Generate a PID control scheme
 	kp = diag([3 3 3]);
-	ki = diag([0 0 0]);
+	ki = diag([0.01 0.01 0.01]);
 	kd = diag([2 2 2]);
     output = zeros(4,1);
     output(1) = m*g/(cos(X3(1))*cos(X3(2)));
@@ -142,7 +144,7 @@ end
 
 function output = SMControl(X1,X2,X3,X4, intermediate1, R_omega, m, g, kdz, I)	% Generate a sliding mode scheme
 	k1 = 1; k2 = 1; k3 = 1; k4 = 1;
-    beta1 = .1; beta2 = .05; beta3 = .05; beta4 = .05;
+    beta1 = 2; beta2 = 2; beta3 = 1.5;
 	output  = zeros(4,1);
     s = zeros(4,1);
 
@@ -151,17 +153,14 @@ function output = SMControl(X1,X2,X3,X4, intermediate1, R_omega, m, g, kdz, I)	%
 	s(3) = X4(2) + k3*X3(2);
 	s(4) = X4(3) + k4*X3(3);
 
-	output(1) = (m/cos(X3(2)) * (g + (kdz-k1)*X2(3))) - beta1*sign(s(1));
-	output(2:4) = I * (intermediate1 - R_omega * diag([k2,k3,k4]) * X3) - diag([beta2,beta3,beta4])*sign(s(2:4));
+	%output(1) = (m/cos(X3(2)) * (g + (kdz-k1)*X2(3))) - beta1*sign(s(1));
+    output(1) = m*g/(cos(X3(1))*cos(X3(2)));
+	output(2:4) = I * (intermediate1 - R_omega * diag([k2,k3,k4]) * X3) - diag([beta1,beta2,beta3])*sat(s(2:4), 10);
 end	
 
-function res = sat(x, T)
+function res = sat(x, A)
     res = x;
     for i = 1:numel(x)
-        if x(i) >= T
-            res(i) = T;
-        elseif x(i) <= -T
-            res(i) = -T;
-        end
+        res(i) = 2/(1+exp(-A*x(i))) - 1;
     end
 end
